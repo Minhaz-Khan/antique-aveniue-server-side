@@ -3,7 +3,7 @@ const app = express();
 const cors = require('cors');
 const port = process.env.REACT_PROT || 5000;
 const jwt = require('jsonwebtoken');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 app.use(cors())
 app.use(express.json())
@@ -15,12 +15,13 @@ const verifyJWT = (req, res, next) => {
         res.status(401).send('unauthorized access')
     }
     const token = authHeaders.split(' ')[1];
-    console.log(token);
+
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
         if (err) {
             return res.status(403).send({ message: 'forbidden' })
         }
-        res.decoded = decoded;
+
+        req.decoded = decoded;
         next()
     })
 
@@ -41,7 +42,6 @@ async function run() {
             const email = req.query.email;
             const filter = { email: email }
             const user = await userCollection.findOne(filter);
-            console.log(user);
             if (!user) {
 
                 return res.status(403).send({ accessToken: '' })
@@ -72,17 +72,25 @@ async function run() {
         app.post('/booking', verifyJWT, async (req, res) => {
             const bookingInfo = req.body;
             const email = bookingInfo.buyerEmail;
-            const filter = { buyerEmail: email };
-            const allBookings = await bookingCollection.find().toArray();
-            const isBooked = allBookings.map(booking => booking.bookedProductId === bookingInfo.bookedProductId);
+            const query = { buyerEmail: email };
+            const allBookings = await bookingCollection.find(query).toArray();
+            const isBooked = allBookings.find(booking => booking.bookedProductId === bookingInfo.bookedProductId);
+
             if (isBooked) {
                 return res.send({ message: 'alreay booked' })
             }
             const result = await bookingCollection.insertOne(bookingInfo);
             res.send(result)
         })
+        app.delete('/booking/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            console.log(id);
+            const query = { _id: new ObjectId(id) }
+            const result = await bookingCollection.deleteOne(query);
+            res.send(result)
+        })
         app.get('/mybooking', verifyJWT, async (req, res) => {
-            const email = req.params.email;
+            const email = req.query.email;
             const decodedEmail = req.decoded.email;
             const query = { buyerEmail: email }
             if (email === decodedEmail) {
@@ -90,6 +98,14 @@ async function run() {
                 return res.send(result)
             }
             res.status(403).send('forbidden access')
+        })
+
+        app.get('/userType', async (req, res) => {
+            const email = req.query.email;
+            const filter = { email: email };
+            const user = await userCollection.findOne(filter);
+            const userType = user.userType
+            res.send({ userType })
         })
     }
     catch { }
