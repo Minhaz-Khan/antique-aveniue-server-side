@@ -35,8 +35,9 @@ async function run() {
 
     try {
         const userCollection = client.db('antiqueAvenue').collection('users');
-        const allSalePostCollection = client.db('antiqueAvenue').collection('allSalePost')
-        const bookingCollection = client.db('antiqueAvenue').collection('bookings')
+        const allSalePostCollection = client.db('antiqueAvenue').collection('allSalePost');
+        const bookingCollection = client.db('antiqueAvenue').collection('bookings');
+        const wishlistCollection = client.db('antiqueAvenue').collection('wishList');
 
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
@@ -68,6 +69,26 @@ async function run() {
             const allPost = allSalePostCollection.find(query);
             const result = await allPost.toArray();
             res.send(result)
+        })
+        app.post('/addProduct', verifyJWT, async (req, res) => {
+            const product = req.body;
+            const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+            if (email === decodedEmail) {
+                const result = await allSalePostCollection.insertOne(product);
+                return res.send(result)
+            }
+            res.status(403).send('forbidden access')
+        })
+        app.get('/myProduct', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+            const query = { sellerEmail: email };
+            if (email === decodedEmail) {
+                const result = await allSalePostCollection.find(query).toArray();
+                return res.send(result);
+            }
+            res.status(403).send('forbidden access')
         })
         app.post('/booking', verifyJWT, async (req, res) => {
             const bookingInfo = req.body;
@@ -106,6 +127,27 @@ async function run() {
             const user = await userCollection.findOne(filter);
             const userType = user.userType
             res.send({ userType })
+        })
+        app.post('/wishlist', verifyJWT, async (req, res) => {
+            const wishlistItem = req.body;
+            const result = await wishlistCollection.insertOne(wishlistItem);
+            res.send(result);
+        })
+        app.get('/wishlist', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+            const query = { buyerEmail: email }
+            if (email === decodedEmail) {
+                const result = await wishlistCollection.find(query).toArray()
+                return res.send(result)
+            }
+            res.status(403).send('forbidden access')
+        })
+        app.delete('/wishlist/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const result = await wishlistCollection.deleteOne(filter);
+            res.send(result);
         })
     }
     catch { }
