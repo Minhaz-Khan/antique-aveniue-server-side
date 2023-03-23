@@ -8,6 +8,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 app.use(cors())
 app.use(express.json())
 require('dotenv').config()
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const verifyJWT = (req, res, next) => {
     const authHeaders = req.headers.authorization
@@ -38,6 +39,7 @@ async function run() {
         const allSalePostCollection = client.db('antiqueAvenue').collection('allSalePost');
         const bookingCollection = client.db('antiqueAvenue').collection('bookings');
         const wishlistCollection = client.db('antiqueAvenue').collection('wishList');
+        const paymentCollection = client.db('antiqueAvenue').collection('payments');
 
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
@@ -60,7 +62,6 @@ async function run() {
                 return res.send(result)
             }
             res.send({ oldUser: true })
-
 
         })
         app.get('/allSalePost', verifyJWT, async (req, res) => {
@@ -148,6 +149,51 @@ async function run() {
             const filter = { _id: new ObjectId(id) };
             const result = await wishlistCollection.deleteOne(filter);
             res.send(result);
+        })
+
+        app.post("/create-payment-intent", async (req, res) => {
+            const booking = req.body;
+            const amount = booking.price * 100
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ],
+
+            })
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            })
+        })
+
+        app.post('/payments', verifyJWT, async (req, res) => {
+            const paymentInfo = req.body;
+            const id = paymentInfo.bookingId;
+            const filter = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: paymentInfo.TransactionId
+                }
+            }
+            const result = await paymentCollection.insertOne(paymentInfo);
+            const updateBookings = await bookingCollection.updateOne(filter, updateDoc)
+            res.send(result)
+        })
+        app.post('/wishlistpayments', verifyJWT, async (req, res) => {
+            const paymentInfo = req.body;
+            const id = paymentInfo.bookingId;
+            const filter = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: paymentInfo.TransactionId
+                }
+            }
+            const result = await paymentCollection.insertOne(paymentInfo);
+            const updateWishlist = await wishlistCollection.updateOne(filter, updateDoc)
+            res.send(result)
         })
     }
     catch { }
