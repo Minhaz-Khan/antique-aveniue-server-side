@@ -91,6 +91,43 @@ async function run() {
             }
             res.status(403).send('forbidden access')
         })
+
+        app.put('/myProduct/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: {
+                    status: 'advertised'
+                }
+            }
+            const result = await allSalePostCollection.updateOne(filter, updateDoc, options)
+            res.send(result)
+        })
+
+
+        app.get('/avertised', verifyJWT, async (req, res) => {
+            const query = { status: 'advertised' }
+            const result = await allSalePostCollection.find(query).toArray();
+            res.send(result)
+        })
+        app.get('/allseller', verifyJWT, async (req, res) => {
+            const query = { userType: 'Seller' }
+            const result = await userCollection.find(query).toArray();
+            res.send(result)
+        })
+        app.get('/allbuyer', verifyJWT, async (req, res) => {
+            const query = { userType: 'Buyer' }
+            const result = await userCollection.find(query).toArray();
+            res.send(result)
+        })
+
+        app.delete('/delteUser/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const result = await userCollection.deleteOne(filter)
+            res.send(result)
+        })
         app.post('/booking', verifyJWT, async (req, res) => {
             const bookingInfo = req.body;
             const email = bookingInfo.buyerEmail;
